@@ -2,6 +2,7 @@ const express = require('express');
 const passport = require('passport');
 const SpotifyStrategy = require('passport-spotify').Strategy;
 const session =  require('express-session');
+const ensureAuthenticated = require('../middleware/auth');
 require('dotenv').config({path: '../.env'});
 
 const app = express();
@@ -52,9 +53,12 @@ app.get('/auth/spotify/callback', passport.authenticate('spotify', {failureRedir
 );
 
 // App Routes
-app.get('/', (req, res) => {
-  res.send('Collaborative Playlist App Home Page');
+app.get('/', ensureAuthenticated, (req, res) => {
+  res.send('Welcome to your Collaborative Playlist App!');
 });
+
+//Add /login route in case login fails that tells the user what the next step is.
+
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
