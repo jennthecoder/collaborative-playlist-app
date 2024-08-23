@@ -3,16 +3,25 @@ const passport = require('passport');
 const SpotifyStrategy = require('passport-spotify').Strategy;
 const session =  require('express-session');
 const ensureAuthenticated = require('../middleware/auth');
-require('dotenv').config({path: '../.env'});
+const  {getAccessToken, createPlaylist, getUserPlaylists} = require('../utils/spotifyHelpers');
+require('dotenv').config();
+//require('dotenv').config({ path: __dirname + '/../.env' });
+
 
 const app = express();
+
+//#########    GLOBAL VARIABLES   #################
 const port = process.env.PORT || 3000;
+const clientID = process.env.SPOTIFY_CLIENT_ID
+const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
+
+//#########   PASSPORT AND SESSION SETUP   ###############
 
 passport.use(
   new SpotifyStrategy(
     {
-      clientID: process.env.SPOTIFY_CLIENT_ID,
-      clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+      clientID: clientID,
+      clientSecret: clientSecret,
       callbackURL: process.env.CALLBACK_URL
     },
     function (accessToken, refreshToken, expires_in, profile, done) {
@@ -39,9 +48,12 @@ passport.deserializeUser((obj, done) =>  done(null, obj));
 app.use(passport.initialize());
 app.use(passport.session());
 
+
+//########################## ROUTES #######################################
+
 // Spotify Route Middleware
 app.get('/auth/spotify', passport.authenticate('spotify', {
-   scope: ['user-read-email', 'playlist-modify-public']
+   scope: ['user-read-email', 'playlist-modify-public', 'playlist-modify-private', 'ugc-image-upload']
   })
 );
 
@@ -58,6 +70,35 @@ app.get('/', ensureAuthenticated, (req, res) => {
 });
 
 //Add /login route in case login fails that tells the user what the next step is.
+
+//Playlist Routes
+app.post('/playlists', ensureAuthenticated, async (req, res) => {
+  const { name, description, public, collaborative} = req.body;
+  const accessToken = await getAccessToken(clientID, clientSecret)
+  try {
+    const response = await createPlaylist(req.user.id, name , description, public, collaborative, accessToken);
+    res.status(201).json(response);
+  } catch (error) {
+    res.status(500).json({ error: `${error}`});
+  }
+});
+
+app.get('/playlists', ensureAuthenticated, async (req, res) => {
+
+  try {
+    const accessToken = await getAccessToken(clientID, clientSecret)
+    const playlists = await getUserPlaylists(req.user.id, accessToken);
+    res.status(200).json(playlists)
+  } catch (error) {
+    res.status(500).json({error: `${error}`});
+  }
+});
+
+//Modify playlist route  - PUT /playlists/{playlist_id}/tracks  - reorder or replace items in a playlist
+
+//Add to a playlist -  /playlists/{playlist_id}/tracks
+
+
 
 
 app.listen(port, () => {
